@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>P2P传输 - 跨网络文件与文本传输</title>
+    <meta name="description" content="基于WebRTC的点对点传输工具，支持跨网络文件和文本传输">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- 顶部导航栏 -->
+        <header class="header">
+            <h1 class="logo">
+                <span class="logo-icon">🔗</span>
+                P2P传输
+            </h1>
+            <div class="header-actions">
+                <span id="connectionStatus" class="status-badge status-disconnected">
+                    <span class="status-dot"></span>
+                    未连接
+                </span>
+                <button id="themeToggle" class="theme-toggle" title="切换主题">
+                    <span class="theme-icon-light">🌙</span>
+                    <span class="theme-icon-dark">☀️</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- 连接界面 -->
+        <section id="connectionSection" class="section connection-section">
+            <div class="card connect-card">
+                <div class="tabs">
+                    <button class="tab-btn active" data-tab="create">创建房间</button>
+                    <button class="tab-btn" data-tab="join">加入房间</button>
+                </div>
+
+                <div id="createTab" class="tab-content active">
+                    <div class="tab-inner">
+                        <p class="tab-description">创建一个新房间，将房间码分享给对方</p>
+                        <button id="createRoomBtn" class="btn btn-primary btn-lg">
+                            <span class="btn-icon">✨</span>
+                            创建房间
+                        </button>
+                        <div id="roomCodeDisplay" class="room-code-display hidden">
+                            <p class="room-code-label">房间码</p>
+                            <div class="room-code-value" id="roomCodeValue"></div>
+                            <button id="copyRoomCodeBtn" class="btn btn-secondary btn-sm">
+                                📋 复制房间码
+                            </button>
+                            <p class="room-code-hint">等待对方加入...</p>
+                            <div class="loading-dots">
+                                <span></span><span></span><span></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="joinTab" class="tab-content">
+                    <div class="tab-inner">
+                        <p class="tab-description">输入对方分享的房间码加入</p>
+                        <div class="input-group">
+                            <input type="text" id="joinCodeInput" class="input" 
+                                   placeholder="输入6位房间码" maxlength="6" 
+                                   autocomplete="off" spellcheck="false">
+                            <button id="joinRoomBtn" class="btn btn-primary">
+                                加入
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 传输界面 -->
+        <section id="transferSection" class="section transfer-section hidden">
+            <div class="transfer-header">
+                <div class="room-info">
+                    <span class="room-info-label">房间码:</span>
+                    <span id="currentRoomCode" class="room-info-code"></span>
+                </div>
+                <button id="disconnectBtn" class="btn btn-danger btn-sm">断开连接</button>
+            </div>
+
+            <div class="transfer-grid">
+                <!-- 文件传输区域 -->
+                <div class="card transfer-card">
+                    <h2 class="card-title">
+                        <span class="card-icon">📁</span>
+                        文件传输
+                    </h2>
+                    
+                    <div class="file-drop-zone" id="fileDropZone">
+                        <div class="drop-zone-content">
+                            <span class="drop-zone-icon">📤</span>
+                            <p class="drop-zone-text">拖放文件到这里</p>
+                            <p class="drop-zone-hint">或点击选择文件</p>
+                        </div>
+                        <input type="file" id="fileInput" multiple hidden>
+                    </div>
+
+                    <div id="sendingFiles" class="file-list sending-files hidden">
+                        <h3 class="file-list-title">发送中</h3>
+                        <div id="sendingFilesList"></div>
+                    </div>
+
+                    <div id="receivedFiles" class="file-list received-files hidden">
+                        <h3 class="file-list-title">已接收</h3>
+                        <div id="receivedFilesList"></div>
+                    </div>
+                </div>
+
+                <!-- 文本传输区域 -->
+                <div class="card transfer-card">
+                    <h2 class="card-title">
+                        <span class="card-icon">📝</span>
+                        文本传输
+                    </h2>
+                    
+                    <div class="text-send-area">
+                        <textarea id="textInput" class="textarea" 
+                                  placeholder="输入要发送的文本..."></textarea>
+                        <button id="sendTextBtn" class="btn btn-primary">
+                            发送文本
+                        </button>
+                    </div>
+
+                    <div id="receivedTexts" class="text-list hidden">
+                        <h3 class="text-list-title">收到的文本</h3>
+                        <div id="textMessages"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 消息提示 -->
+        <div id="toast" class="toast hidden"></div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
