@@ -8,7 +8,7 @@
     <meta name="description" content="基于WebRTC的点对点传输工具，支持跨网络文件和文本传输">
     <link rel="stylesheet" href="style.css">
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-    <script src="https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs2@0.0.2/qrcode.min.js"></script>
 </head>
 
 <body>
@@ -58,7 +58,7 @@
                                 </button>
                             </div>
                             <div id="qrcodeContainer" class="qrcode-container hidden">
-                                <canvas id="qrcodeCanvas"></canvas>
+                                <div id="qrcodeCanvas"></div>
                                 <p class="qrcode-hint">手机扫描二维码加入</p>
                             </div>
                             <p class="room-code-hint">等待对方加入...</p>

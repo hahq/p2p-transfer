@@ -210,23 +210,24 @@ async function createRoom() {
 
 // ===== 二维码功能 =====
 
+let qrcodeInstance = null; // 保存二维码实例
+
 // 生成二维码
 function generateQRCode() {
     const joinUrl = getJoinUrl(currentRoomCode);
-    const canvas = elements.qrcodeCanvas;
+    const container = elements.qrcodeCanvas;
 
-    QRCode.toCanvas(canvas, joinUrl, {
+    // 清空之前的二维码
+    container.innerHTML = '';
+
+    // 使用 qrcodejs 的 API
+    qrcodeInstance = new QRCode(container, {
+        text: joinUrl,
         width: 180,
-        margin: 2,
-        color: {
-            dark: '#1e293b',
-            light: '#ffffff'
-        }
-    }, function (error) {
-        if (error) {
-            console.error('二维码生成失败:', error);
-            showToast('二维码生成失败', 'error');
-        }
+        height: 180,
+        colorDark: '#1e293b',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M
     });
 }
 
