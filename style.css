@@ -701,6 +701,30 @@ body {
     color: var(--accent-danger);
 }
 
+.file-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.file-download-status {
+    font-size: 0.7rem;
+    padding: 3px 8px;
+    border-radius: 10px;
+    font-weight: 500;
+}
+
+.file-download-status.not-downloaded {
+    background-color: rgba(245, 158, 11, 0.15);
+    color: #f59e0b;
+}
+
+.file-download-status.downloaded {
+    background-color: var(--accent-success-light);
+    color: var(--accent-success);
+}
+
 .file-download-btn {
     padding: 8px 14px;
     background-color: var(--accent-success);

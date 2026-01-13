@@ -30,6 +30,9 @@ let lastHeartbeat = 0;          // 最后收到心跳的时间
 let heartbeatCheckTimer = null; // 心跳检查定时器
 let transferCheckTimer = null;  // 传输超时检查定时器
 
+// 已完成文件列表 {fileId: {name, size, url, downloaded}}
+let completedFiles = {};
+
 // ===== DOM 元素 =====
 const elements = {
     // 主题
@@ -714,6 +717,14 @@ function receiveFileComplete(data) {
     // 创建下载链接
     const url = URL.createObjectURL(blob);
 
+    // 保存到已完成文件列表
+    completedFiles[data.fileId] = {
+        name: fileData.meta.name,
+        size: fileData.meta.size,
+        url: url,
+        downloaded: false
+    };
+
     // 更新UI
     updateFileStatus(data.fileId, 'completed', url, fileData.meta.name);
     showToast(`文件 "${fileData.meta.name}" 接收完成`, 'success');
@@ -767,14 +778,18 @@ function updateFileStatus(fileId, status, downloadUrl, fileName) {
     if (!el) return;
 
     const statusEl = el.querySelector('.file-status');
+    if (!statusEl) return;
 
     if (status === 'completed') {
         if (downloadUrl) {
-            // 接收完成，显示下载按钮
+            // 接收完成，显示下载按钮和未下载标记
             statusEl.outerHTML = `
-                <button class="file-download-btn" onclick="downloadFile('${downloadUrl}', '${fileName}')">
-                    ⬇️ 下载
-                </button>
+                <div class="file-actions">
+                    <span class="file-download-status not-downloaded" id="status-${fileId}">未下载</span>
+                    <button class="file-download-btn" onclick="downloadFile('${downloadUrl}', '${fileName}', '${fileId}')">
+                        ⬇️ 下载
+                    </button>
+                </div>
             `;
         } else {
             // 发送完成
@@ -785,13 +800,27 @@ function updateFileStatus(fileId, status, downloadUrl, fileName) {
 }
 
 // 下载文件
-function downloadFile(url, fileName) {
+function downloadFile(url, fileName, fileId) {
     const a = document.createElement('a');
     a.href = url;
     a.download = fileName;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+
+    // 更新下载状态
+    if (fileId && completedFiles[fileId]) {
+        completedFiles[fileId].downloaded = true;
+
+        // 更新UI状态
+        const statusEl = document.getElementById(`status-${fileId}`);
+        if (statusEl) {
+            statusEl.className = 'file-download-status downloaded';
+            statusEl.textContent = '已下载';
+        }
+    }
+
+    showToast(`文件 "${fileName}" 正在下载`, 'success');
 }
 
 // 获取文件图标
