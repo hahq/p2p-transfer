@@ -696,6 +696,11 @@ body {
     color: var(--accent-success);
 }
 
+.file-status.error {
+    background-color: var(--accent-danger-light);
+    color: var(--accent-danger);
+}
+
 .file-download-btn {
     padding: 8px 14px;
     background-color: var(--accent-success);

@@ -7,6 +7,9 @@
 const CONFIG = {
     CHUNK_SIZE: 64 * 1024,  // 文件分块大小：64KB
     ROOM_CODE_LENGTH: 6,     // 房间码长度
+    HEARTBEAT_INTERVAL: 5000, // 心跳间隔：5秒
+    HEARTBEAT_TIMEOUT: 15000, // 心跳超时：15秒
+    TRANSFER_TIMEOUT: 30000,  // 传输超时：30秒无进度
     PEERJS_CONFIG: {
         // 使用PeerJS公共服务器
         // 如果连接不稳定，可以考虑自建服务器
@@ -19,7 +22,13 @@ let connection = null;     // 当前连接
 let currentRoomCode = '';  // 当前房间码
 let isHost = false;        // 是否是房间创建者
 let pendingFiles = [];     // 待发送文件队列
-let receivingFiles = {};   // 正在接收的文件 {fileId: {meta, chunks, receivedSize}}
+let receivingFiles = {};   // 正在接收的文件 {fileId: {meta, chunks, receivedSize, lastUpdate}}
+
+// 心跳和连接保活
+let heartbeatTimer = null;      // 心跳定时器
+let lastHeartbeat = 0;          // 最后收到心跳的时间
+let heartbeatCheckTimer = null; // 心跳检查定时器
+let transferCheckTimer = null;  // 传输超时检查定时器
 
 // ===== DOM 元素 =====
 const elements = {
@@ -322,6 +331,9 @@ function setupConnection() {
         updateConnectionStatus('connected');
         showTransferSection();
         showToast('连接成功！', 'success');
+
+        // 启动心跳保活
+        startHeartbeat();
     });
 
     connection.on('data', handleData);
@@ -337,6 +349,116 @@ function setupConnection() {
         showToast('连接出现错误', 'error');
     });
 }
+
+// ===== 心跳保活机制 =====
+
+// 启动心跳
+function startHeartbeat() {
+    lastHeartbeat = Date.now();
+
+    // 清除旧的定时器
+    stopHeartbeat();
+
+    // 定期发送心跳
+    heartbeatTimer = setInterval(() => {
+        if (connection && connection.open) {
+            try {
+                connection.send({ type: 'heartbeat', timestamp: Date.now() });
+            } catch (e) {
+                console.error('发送心跳失败:', e);
+            }
+        }
+    }, CONFIG.HEARTBEAT_INTERVAL);
+
+    // 检查心跳超时
+    heartbeatCheckTimer = setInterval(() => {
+        if (Date.now() - lastHeartbeat > CONFIG.HEARTBEAT_TIMEOUT) {
+            console.warn('心跳超时，连接可能已断开');
+            // 检查连接状态
+            if (connection && !connection.open) {
+                showToast('连接已断开', 'error');
+                resetConnection();
+            }
+        }
+    }, CONFIG.HEARTBEAT_INTERVAL);
+
+    // 检查传输超时
+    transferCheckTimer = setInterval(checkTransferTimeout, 5000);
+}
+
+// 停止心跳
+function stopHeartbeat() {
+    if (heartbeatTimer) {
+        clearInterval(heartbeatTimer);
+        heartbeatTimer = null;
+    }
+    if (heartbeatCheckTimer) {
+        clearInterval(heartbeatCheckTimer);
+        heartbeatCheckTimer = null;
+    }
+    if (transferCheckTimer) {
+        clearInterval(transferCheckTimer);
+        transferCheckTimer = null;
+    }
+}
+
+// 检查传输超时
+function checkTransferTimeout() {
+    const now = Date.now();
+
+    for (const fileId in receivingFiles) {
+        const file = receivingFiles[fileId];
+        if (file.lastUpdate && now - file.lastUpdate > CONFIG.TRANSFER_TIMEOUT) {
+            console.warn('文件传输超时:', file.meta.name);
+
+            // 更新UI显示超时
+            const el = document.getElementById(`file-${fileId}`);
+            if (el) {
+                const statusEl = el.querySelector('.file-status');
+                if (statusEl) {
+                    statusEl.className = 'file-status error';
+                    statusEl.textContent = '传输超时';
+                }
+            }
+
+            showToast(`文件 "${file.meta.name}" 传输超时`, 'error');
+
+            // 清理超时的文件
+            delete receivingFiles[fileId];
+        }
+    }
+}
+
+// 处理页面可见性变化（手机后台处理）
+function handleVisibilityChange() {
+    if (document.hidden) {
+        console.log('页面进入后台');
+    } else {
+        console.log('页面回到前台');
+
+        // 检查连接状态
+        if (connection) {
+            if (connection.open) {
+                // 连接仍然活跃，发送心跳确认
+                try {
+                    connection.send({ type: 'heartbeat', timestamp: Date.now() });
+                    console.log('连接仍然活跃');
+                } catch (e) {
+                    console.error('连接已失效:', e);
+                    showToast('连接已断开，请重新连接', 'error');
+                    resetConnection();
+                }
+            } else {
+                // 连接已关闭
+                showToast('连接已断开，请重新连接', 'error');
+                resetConnection();
+            }
+        }
+    }
+}
+
+// 初始化页面可见性监听
+document.addEventListener('visibilitychange', handleVisibilityChange);
 
 // 处理Peer错误
 function handlePeerError(err) {
@@ -405,6 +527,9 @@ function resetConnection() {
     // 重置二维码
     elements.qrcodeContainer.classList.add('hidden');
     elements.showQRCodeBtn.innerHTML = '📱 显示二维码';
+
+    // 停止心跳
+    stopHeartbeat();
 }
 
 // 显示传输界面
@@ -437,6 +562,14 @@ function updateConnectionStatus(status) {
 
 // ===== 数据处理 =====
 function handleData(data) {
+    // 更新心跳时间
+    lastHeartbeat = Date.now();
+
+    // 心跳消息不需要处理
+    if (data.type === 'heartbeat') {
+        return;
+    }
+
     console.log('收到数据:', data.type || 'unknown');
 
     switch (data.type) {
@@ -540,7 +673,8 @@ function receiveFileMeta(data) {
     receivingFiles[data.fileId] = {
         meta: data,
         chunks: new Array(data.totalChunks),
-        receivedSize: 0
+        receivedSize: 0,
+        lastUpdate: Date.now() // 记录开始时间
     };
 
     // 显示接收列表
@@ -563,6 +697,7 @@ function receiveFileChunk(data) {
 
     fileData.chunks[data.chunkIndex] = data.data;
     fileData.receivedSize += data.data.byteLength;
+    fileData.lastUpdate = Date.now(); // 更新最后接收时间
 
     const progress = (fileData.receivedSize / fileData.meta.size) * 100;
     updateFileProgress(data.fileId, progress);
