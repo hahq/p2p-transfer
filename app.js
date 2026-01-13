@@ -63,13 +63,19 @@ const elements = {
     joinTab: document.getElementById('joinTab'),
 
     // Toast
-    toast: document.getElementById('toast')
+    toast: document.getElementById('toast'),
+
+    // 二维码
+    showQRCodeBtn: document.getElementById('showQRCodeBtn'),
+    qrcodeContainer: document.getElementById('qrcodeContainer'),
+    qrcodeCanvas: document.getElementById('qrcodeCanvas')
 };
 
 // ===== 初始化 =====
 function init() {
     initTheme();
     initEventListeners();
+    checkUrlParams(); // 检查URL参数是否有房间码
 }
 
 // ===== 主题管理 =====
@@ -140,6 +146,9 @@ function initEventListeners() {
     elements.textInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter' && e.ctrlKey) sendText();
     });
+
+    // 显示二维码
+    elements.showQRCodeBtn.addEventListener('click', toggleQRCode);
 }
 
 // ===== 选项卡切换 =====
@@ -196,6 +205,70 @@ async function createRoom() {
         console.error('创建房间失败:', error);
         showToast('创建房间失败，请重试', 'error');
         resetConnection();
+    }
+}
+
+// ===== 二维码功能 =====
+
+// 生成二维码
+function generateQRCode() {
+    const joinUrl = getJoinUrl(currentRoomCode);
+    const canvas = elements.qrcodeCanvas;
+
+    QRCode.toCanvas(canvas, joinUrl, {
+        width: 180,
+        margin: 2,
+        color: {
+            dark: '#1e293b',
+            light: '#ffffff'
+        }
+    }, function (error) {
+        if (error) {
+            console.error('二维码生成失败:', error);
+            showToast('二维码生成失败', 'error');
+        }
+    });
+}
+
+// 获取加入房间的URL
+function getJoinUrl(roomCode) {
+    const baseUrl = window.location.origin + window.location.pathname;
+    return `${baseUrl}?room=${roomCode}`;
+}
+
+// 切换显示二维码
+function toggleQRCode() {
+    const container = elements.qrcodeContainer;
+    const btn = elements.showQRCodeBtn;
+
+    if (container.classList.contains('hidden')) {
+        generateQRCode();
+        container.classList.remove('hidden');
+        btn.innerHTML = '🔼 隐藏二维码';
+    } else {
+        container.classList.add('hidden');
+        btn.innerHTML = '📱 显示二维码';
+    }
+}
+
+// 检查URL参数自动加入房间
+function checkUrlParams() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomCode = urlParams.get('room');
+
+    if (roomCode && roomCode.length === CONFIG.ROOM_CODE_LENGTH) {
+        // 清除URL参数，避免刷新后重复加入
+        window.history.replaceState({}, document.title, window.location.pathname);
+
+        // 自动填入房间码并切换到加入选项卡
+        elements.joinCodeInput.value = roomCode.toUpperCase();
+        switchTab('join');
+
+        // 延迟一点自动加入，让用户看到界面
+        setTimeout(() => {
+            showToast('正在自动加入房间...', 'success');
+            joinRoom();
+        }, 500);
     }
 }
 
@@ -327,6 +400,10 @@ function resetConnection() {
     elements.sendingFiles.classList.add('hidden');
     elements.receivedFiles.classList.add('hidden');
     elements.receivedTexts.classList.add('hidden');
+
+    // 重置二维码
+    elements.qrcodeContainer.classList.add('hidden');
+    elements.showQRCodeBtn.innerHTML = '📱 显示二维码';
 }
 
 // 显示传输界面
